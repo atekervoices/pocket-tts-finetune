@@ -14,6 +14,9 @@ Supports Python 3.10, 3.11, 3.12, 3.13 and 3.14. Requires PyTorch 2.5+. Does not
 [📄 Paper](https://arxiv.org/abs/2509.06926) | 
 [📚 Documentation](https://kyutai-labs.github.io/pocket-tts/)
 
+> [!IMPORTANT]
+> **Multilingual Fine-Tuning Pipeline:** For fine-tuning Pocket-TTS on custom multilingual speech datasets and speakers (Waxal, Kinyarwanda, Salt, Pidgin, Wolof, Twi, Vo/Ewe), see the complete [**Fine-Tuning Guide (FINETUNE_GUIDE.md)**](FINETUNE_GUIDE.md), [**pocket_tts_finetune.py**](pocket_tts_finetune.py), and [**pocket_tts_train_notebook.ipynb**](pocket_tts_train_notebook.ipynb).
+
 > [!NOTE]
 > **New (August 2026):** We've released the training code! Check out [`training/`](https://github.com/kyutai-labs/pocket-tts/blob/main/training/README.md) to start training your own models.
 > Open a PR to add your model to the [Models trained by the community](#models-trained-by-the-community) section.
