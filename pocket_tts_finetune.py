@@ -171,6 +171,29 @@ def prepare_custom_datasets(
     if not all_records:
         raise RuntimeError("No valid audio records extracted from datasets.")
 
+    # Save Speaker Reference Samples Catalog for Testing
+    speaker_samples_dir = data_dir / "speaker_samples"
+    speaker_samples_dir.mkdir(parents=True, exist_ok=True)
+    speaker_catalog = {}
+
+    for r in all_records:
+        key = f"{r['language']}_{r['speaker']}"
+        if key not in speaker_catalog and 3.0 <= r["duration"] <= 12.0:
+            dest_wav = speaker_samples_dir / f"{key}_ref.wav"
+            import shutil
+            shutil.copyfile(r["path"], dest_wav)
+            speaker_catalog[key] = {
+                "language": r["language"],
+                "speaker_id": r["speaker"],
+                "reference_audio_path": str(dest_wav.resolve()),
+                "sample_transcript": r["transcript"],
+            }
+
+    catalog_path = data_dir / "speakers_catalog.json"
+    with open(catalog_path, "w", encoding="utf-8") as f:
+        json.dump(speaker_catalog, f, indent=2, ensure_ascii=False)
+    logger.info(f"Saved speaker reference catalog ({len(speaker_catalog)} speakers) to {catalog_path}")
+
     # Train / Validation Split
     import random
     random.seed(42)
