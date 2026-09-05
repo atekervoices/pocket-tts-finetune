@@ -1,0 +1,39 @@
+# Finetune Pocket TTS 24-layer teacher on custom African languages & speakers
+# Datasets: Waxal, Kinyarwanda, Salt, Pidgin, Wolof, Twi, Vo/Ewe
+model_config: pocket_tts/config/english_2026-04_24l.yaml
+model_overrides:
+  flow_lm.lookup_table.tokenizer_path: data/custom_dataset/tokenizer.model
+start_from_pretrained: true
+reset_text_embedding: true  # new multilingual SentencePiece tokenizer
+
+data:
+  train_jsonl: data/custom_dataset/train_aligned.jsonl
+  valid_jsonl: data/custom_dataset/valid_aligned.jsonl
+  max_duration_sec: 30.0
+  max_voice_prompt_sec: 5.0
+
+flow:
+  type: lsd
+  kwargs: {}
+
+flow_batch_multiplier: 4
+eos_loss_weight: 0.1
+text_dropout: 0.2
+voice_dropout: 0.2
+
+optim:
+  lr: 2e-4
+  schedule: constant
+  warmup_steps: 1000
+
+run_dir: runs/finetune_custom_languages
+batch_size: 32
+grad_accum_steps: 2
+max_steps: 50000
+stats_ema_steps: 500
+ema_decay: 0.999
+log_freq: 50
+valid_freq: 1000
+ckpt_freq: 2500
+num_ckpt_keep: 3
+sample_cfg_coef: 2.0
