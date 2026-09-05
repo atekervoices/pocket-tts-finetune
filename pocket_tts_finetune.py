@@ -101,10 +101,12 @@ def prepare_custom_datasets(
     val_split_ratio: float = 0.02,
     max_duration_sec: float = 30.0,
     min_duration_sec: float = 1.0,
+    streaming: bool = True,
+    max_samples_per_dataset: Optional[int] = None,
 ) -> tuple[Path, Path]:
     """
-    Downloads HF datasets, normalizes audio to 24kHz mono WAV, and creates
-    train.jsonl and valid.jsonl manifests compatible with Pocket-TTS.
+    Streams and downloads HF datasets on the fly, normalizes audio to 24kHz mono WAV,
+    and creates train.jsonl, valid.jsonl manifests, and speaker reference catalog.
     """
     data_dir.mkdir(parents=True, exist_ok=True)
     audio_dir.mkdir(parents=True, exist_ok=True)
@@ -116,20 +118,23 @@ def prepare_custom_datasets(
         logger.info(f"Manifests already exist at {train_jsonl_path} and {valid_jsonl_path}. Skipping extraction.")
         return train_jsonl_path, valid_jsonl_path
 
-    logger.info("Starting dataset loading and audio preprocessing...")
+    logger.info(f"Starting dataset preprocessing (streaming={streaming})...")
     all_records = []
 
     for d_info in DATASETS_TO_LOAD:
         repo_name = d_info["repo"]
         lang = d_info["lang"]
-        logger.info(f"Loading dataset: {repo_name} ({lang})")
+        logger.info(f"Streaming dataset: {repo_name} ({lang})")
         try:
-            ds = load_dataset(repo_name)
+            ds = load_dataset(repo_name, streaming=streaming)
             split = ds["train"] if "train" in ds else list(ds.values())[0]
-            # Resample audio column to 24 kHz
+            # Resample audio column to 24 kHz on the fly
             split = split.cast_column("audio", Audio(sampling_rate=TARGET_SR))
 
+            count = 0
             for idx, item in enumerate(split):
+                if max_samples_per_dataset and count >= max_samples_per_dataset:
+                    break
                 audio_dict = item.get("audio")
                 if not audio_dict:
                     continue
@@ -163,6 +168,10 @@ def prepare_custom_datasets(
                     "language": lang,
                 }
                 all_records.append(record)
+                count += 1
+
+                if count % 1000 == 0:
+                    logger.info(f"[{lang}] Streamed {count} utterances...")
 
         except Exception as e:
             logger.error(f"Error loading {repo_name}: {e}")
@@ -469,6 +478,8 @@ def main():
     parser = argparse.ArgumentParser(description="Pocket-TTS Multilingual Fine-Tuning")
     parser.add_argument("--config", type=str, default=str(DEFAULT_CONFIG_PATH), help="Path to config YAML")
     parser.add_argument("--skip-data-prep", action="store_true", help="Skip dataset extraction")
+    parser.add_argument("--no-stream", action="store_true", help="Disable streaming (download full dataset archives locally)")
+    parser.add_argument("--max-samples", type=int, default=None, help="Max samples per dataset (for rapid testing)")
     parser.add_argument("--skip-train", action="store_true", help="Skip training step")
     parser.add_argument("--push-to-hub", action="store_true", help="Push trained model to Hugging Face")
     parser.add_argument("--hf-repo", type=str, default=HF_REPO_NAME, help="HF repository name")
@@ -476,7 +487,10 @@ def main():
 
     # Step 1: Prepare Datasets
     if not args.skip_data_prep:
-        train_jsonl, valid_jsonl = prepare_custom_datasets()
+        train_jsonl, valid_jsonl = prepare_custom_datasets(
+            streaming=(not args.no_stream),
+            max_samples_per_dataset=args.max_samples,
+        )
         # Step 2: Fit Tokenizer
         tokenizer_model = train_multilingual_tokenizer([train_jsonl, valid_jsonl])
         logger.info(f"Datasets and tokenizer ready: {tokenizer_model}")
